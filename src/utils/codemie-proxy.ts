@@ -26,16 +26,17 @@ import { createServer, Server, IncomingMessage, ServerResponse } from 'http';
 import { randomUUID } from 'crypto';
 import { URL } from 'url';
 import { CredentialStore } from './credential-store.js';
+import { ProviderRegistry } from '../providers/core/registry.js';
 import { logger } from './logger.js';
 import { getAnalytics } from '../analytics/index.js';
 import { loadAnalyticsConfig } from '../analytics/config.js';
 import { RemoteAnalyticsSubmitter } from '../analytics/remote-submission/index.js';
-import { ProxyHTTPClient } from './proxy/http-client.js';
-import { ProxyConfig, ProxyContext } from './proxy/types.js';
-import { AuthenticationError, NetworkError, TimeoutError, normalizeError } from './proxy/errors.js';
-import { getPluginRegistry } from './proxy/plugins/registry.js';
-import { PluginContext, ProxyInterceptor, ResponseMetadata } from './proxy/plugins/types.js';
-import './proxy/plugins/index.js'; // Auto-register core plugins
+import { ProxyHTTPClient } from '../proxy/http-client.js';
+import { ProxyConfig, ProxyContext } from '../proxy/types.js';
+import { AuthenticationError, NetworkError, TimeoutError, normalizeError } from '../proxy/errors.js';
+import { getPluginRegistry } from '../proxy/plugins/registry.js';
+import { PluginContext, ProxyInterceptor, ResponseMetadata } from '../proxy/plugins/types.js';
+import '../proxy/plugins/index.js'; // Auto-register core plugins
 
 /**
  * CodeMie Proxy - Plugin-based HTTP proxy with streaming
@@ -60,9 +61,13 @@ export class CodeMieProxy {
    * Start the proxy server
    */
   async start(): Promise<{ port: number; url: string }> {
-    // 1. Load credentials (if needed for SSO)
+    // 1. Check if provider uses SSO authentication
+    const provider = ProviderRegistry.getProvider(this.config.provider || '');
+    const isSSOProvider = provider?.authType === 'sso';
+
+    // 2. Load credentials (if needed for SSO)
     let credentials: any = null;
-    if (this.config.provider === 'ai-run-sso') {
+    if (isSSOProvider) {
       const store = CredentialStore.getInstance();
       credentials = await store.retrieveSSOCredentials();
 
@@ -71,13 +76,6 @@ export class CodeMieProxy {
           'SSO credentials not found. Please run: codemie auth login'
         );
       }
-    }
-
-    // 2. Enable analytics plugin if analytics is enabled
-    const analyticsConfig = loadAnalyticsConfig();
-    if (analyticsConfig.enabled) {
-      const registry = getPluginRegistry();
-      await registry.setEnabled('@codemie/proxy-analytics', true);
     }
 
     // 3. Build plugin context
@@ -92,9 +90,10 @@ export class CodeMieProxy {
     const registry = getPluginRegistry();
     this.interceptors = await registry.initialize(pluginContext);
 
-    // 5. Start remote analytics submitter (if needed)
-    if (analyticsConfig.enabled && this.config.provider === 'ai-run-sso' && credentials) {
-      await this.startRemoteAnalyticsSubmitter(credentials);
+    // 5. Start analytics metrics submitter (writes codemie_coding_agent_usage_total metrics)
+    const analyticsConfig = loadAnalyticsConfig();
+    if (analyticsConfig.enabled) {
+      await this.startAnalyticsMetricsSubmitter(isSSOProvider ? credentials : null);
     }
 
     // 6. Find available port
@@ -134,28 +133,37 @@ export class CodeMieProxy {
   }
 
   /**
-   * Start remote analytics submitter
+   * Start analytics metrics submitter
+   * Writes codemie_coding_agent_usage metrics to ~/.codemie/analytics/YYYY-MM-DD.jsonl
    */
-  private async startRemoteAnalyticsSubmitter(credentials: any): Promise<void> {
+  private async startAnalyticsMetricsSubmitter(credentials: any | null): Promise<void> {
     try {
       const analyticsConfig = loadAnalyticsConfig();
-      const cookieString = Object.entries(credentials.cookies)
-        .map(([key, value]) => `${key}=${value}`)
-        .join('; ');
 
-      this.remoteSubmitter = new RemoteAnalyticsSubmitter({
+      // Build config
+      const submitterConfig: any = {
         enabled: true,
         target: analyticsConfig.target,
-        baseUrl: this.config.targetApiUrl,
-        cookies: cookieString,
         interval: parseInt(process.env.CODEMIE_ANALYTICS_REMOTE_INTERVAL || '300000', 10),
         batchSize: parseInt(process.env.CODEMIE_ANALYTICS_REMOTE_BATCH_SIZE || '100', 10)
-      });
+      };
 
+      // Add remote config only if SSO provider with credentials
+      if (credentials && this.config.targetApiUrl) {
+        const cookieString = Object.entries(credentials.cookies)
+          .map(([key, value]) => `${key}=${value}`)
+          .join('; ');
+
+        submitterConfig.baseUrl = this.config.targetApiUrl;
+        submitterConfig.cookies = cookieString;
+      }
+
+      this.remoteSubmitter = new RemoteAnalyticsSubmitter(submitterConfig);
       this.remoteSubmitter.start();
-      logger.debug(`Analytics submitter started (target: ${analyticsConfig.target})`);
+
+      logger.debug(`Analytics metrics submitter started (target: ${analyticsConfig.target})`);
     } catch (error) {
-      logger.error(`Failed to start analytics submitter: ${error}`);
+      logger.error(`Failed to start analytics metrics submitter: ${error}`);
     }
   }
 

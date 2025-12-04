@@ -38,18 +38,23 @@ function createListCommand(): Command {
           const activeLabel = active ? chalk.green(' (Active)') : '';
           console.log(chalk.bold.cyan(`Profile: ${name}${activeLabel}`));
           console.log(chalk.cyan('  Provider:     ') + chalk.white(profile.provider || 'N/A'));
-          console.log(chalk.cyan('  Base URL:     ') + chalk.white(profile.baseUrl || 'N/A'));
+
+          if (profile.codeMieUrl) {
+            console.log(chalk.cyan('  CodeMie URL:  ') + chalk.white(profile.codeMieUrl));
+          }
+
           console.log(chalk.cyan('  Model:        ') + chalk.white(profile.model || 'N/A'));
-          console.log(chalk.cyan('  Timeout:      ') + chalk.white(`${profile.timeout || 300}s`));
-          console.log(chalk.cyan('  Debug:        ') + chalk.white(profile.debug ? 'Yes' : 'No'));
 
           if (profile.authMethod) {
             console.log(chalk.cyan('  Auth Method:  ') + chalk.white(profile.authMethod));
           }
 
-          if (profile.codeMieUrl) {
-            console.log(chalk.cyan('  CodeMie URL:  ') + chalk.white(profile.codeMieUrl));
+          if (profile.codeMieIntegration?.alias) {
+            console.log(chalk.cyan('  Integration:  ') + chalk.white(profile.codeMieIntegration.alias));
           }
+
+          console.log(chalk.cyan('  Timeout:      ') + chalk.white(`${profile.timeout || 300}s`));
+          console.log(chalk.cyan('  Debug:        ') + chalk.white(profile.debug ? 'Yes' : 'No'));
 
           if (profile.apiKey) {
             const maskedKey = profile.apiKey.length > 12
@@ -74,14 +79,80 @@ function createListCommand(): Command {
   return command;
 }
 
+/**
+ * Prompt user to select a profile interactively
+ * Reusable method for switch, delete, and other commands
+ */
+async function promptProfileSelection(message: string): Promise<string> {
+  const profiles = await ConfigLoader.listProfiles();
+
+  if (profiles.length === 0) {
+    throw new Error('No profiles found. Run "codemie setup" to create one.');
+  }
+
+  const currentActive = await ConfigLoader.getActiveProfileName();
+
+  // Create choices with visual indicators
+  const choices = profiles.map(({ name, profile }) => {
+    const isActive = name === currentActive;
+    const activeMarker = isActive ? chalk.green('● ') : chalk.white('○ ');
+    const providerInfo = chalk.dim(`(${profile.provider})`);
+    const displayName = isActive
+      ? chalk.green.bold(name)
+      : chalk.white(name);
+
+    return {
+      name: `${activeMarker}${displayName} ${providerInfo}`,
+      value: name,
+      short: name
+    };
+  });
+
+  const { selectedProfile } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedProfile',
+      message,
+      choices,
+      pageSize: 10
+    }
+  ]);
+
+  return selectedProfile;
+}
+
 function createSwitchCommand(): Command {
   const command = new Command('switch');
 
   command
     .description('Switch active profile')
-    .argument('<profile>', 'Profile name to switch to')
-    .action(async (profileName: string) => {
+    .argument('[profile]', 'Profile name to switch to (optional - will prompt if not provided)')
+    .action(async (profileName?: string) => {
       try {
+        // If no profile name provided, prompt interactively
+        if (!profileName) {
+          const profiles = await ConfigLoader.listProfiles();
+
+          if (profiles.length === 0) {
+            console.log(chalk.yellow('\nNo profiles found. Run "codemie setup" to create one.\n'));
+            return;
+          }
+
+          const currentActive = await ConfigLoader.getActiveProfileName();
+          profileName = await promptProfileSelection('Select profile to switch to:');
+
+          // If already active, no need to switch
+          if (profileName === currentActive) {
+            console.log(chalk.yellow(`\nProfile "${profileName}" is already active.\n`));
+            return;
+          }
+        }
+
+        // TypeScript guard - profileName is guaranteed to be defined here
+        if (!profileName) {
+          throw new Error('Profile name is required');
+        }
+
         const oldProfile = await ConfigLoader.getActiveProfileName();
         await ConfigLoader.switchProfile(profileName);
         console.log(chalk.green(`\n✓ Switched to profile "${profileName}"\n`));
@@ -113,10 +184,27 @@ function createDeleteCommand(): Command {
 
   command
     .description('Delete a profile')
-    .argument('<profile>', 'Profile name to delete')
+    .argument('[profile]', 'Profile name to delete (optional - will prompt if not provided)')
     .option('-y, --yes', 'Skip confirmation')
-    .action(async (profileName: string, options: { yes?: boolean }) => {
+    .action(async (profileName?: string, options: { yes?: boolean } = {}) => {
       try {
+        // If no profile name provided, prompt interactively
+        if (!profileName) {
+          const profiles = await ConfigLoader.listProfiles();
+
+          if (profiles.length === 0) {
+            console.log(chalk.yellow('\nNo profiles found. Run "codemie setup" to create one.\n'));
+            return;
+          }
+
+          profileName = await promptProfileSelection('Select profile to delete:');
+        }
+
+        // TypeScript guard
+        if (!profileName) {
+          throw new Error('Profile name is required');
+        }
+
         // Confirmation
         if (!options.yes) {
           const { confirm } = await inquirer.prompt([
@@ -137,10 +225,19 @@ function createDeleteCommand(): Command {
         await ConfigLoader.deleteProfile(profileName);
         console.log(chalk.green(`\n✓ Profile "${profileName}" deleted\n`));
 
-        // Show new active profile if switched
-        const activeProfile = await ConfigLoader.getActiveProfileName();
-        if (activeProfile) {
-          console.log(chalk.white(`Active profile is now: ${activeProfile}\n`));
+        // Check if any profiles remain
+        const remainingProfiles = await ConfigLoader.listProfiles();
+
+        if (remainingProfiles.length === 0) {
+          // No profiles left - show setup message
+          console.log(chalk.yellow('No profiles remaining.'));
+          console.log(chalk.white('Run ') + chalk.cyan('codemie setup') + chalk.white(' to create a new profile.\n'));
+        } else {
+          // Show new active profile if switched
+          const activeProfile = await ConfigLoader.getActiveProfileName();
+          if (activeProfile) {
+            console.log(chalk.white(`Active profile is now: ${activeProfile}\n`));
+          }
         }
 
         // Track config change

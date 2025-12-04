@@ -1,10 +1,14 @@
 # AI/Run CodeMie CLI
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/codemie-ai/codemie-code/ci.yml?branch=main)](https://github.com/codemie-ai/codemie-code/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![npm version](https://img.shields.io/npm/v/@codemieai/code.svg)](https://www.npmjs.com/package/@codemieai/code)
+[![Release](https://img.shields.io/github/v/release/codemie-ai/codemie-code)](https://github.com/codemie-ai/codemie-code/releases)
+[![npm downloads](https://img.shields.io/npm/dm/@codemieai/code.svg)](https://www.npmjs.com/package/@codemieai/code)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/codemie-ai/codemie-code/ci.yml?branch=main)](https://github.com/codemie-ai/codemie-code/actions/workflows/ci.yml)
+[![GitHub Stars](https://img.shields.io/github/stars/codemie-ai/codemie-code?style=social)](https://github.com/codemie-ai/codemie-code/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/codemie-ai/codemie-code)](https://github.com/codemie-ai/codemie-code/commits/main)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D24.0.0-brightgreen.svg)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3%2B-blue.svg)](https://www.typescriptlang.org/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 > **Unified AI Coding Assistant CLI** - Manage Claude Code, OpenAI Codex, Google Gemini, and custom AI agents from one powerful command-line interface. Multi-provider support (OpenAI, Azure OpenAI, AWS Bedrock, LiteLLM, Enterprise SSO). Built-in LangGraph agent with file operations, git integration, and advanced code generation.
 
@@ -32,18 +36,18 @@ Perfect for developers seeking a powerful alternative to GitHub Copilot or Curso
 ## Quick Start
 
 ```bash
-# 1. Install
-npm install -g @codemieai/code
+# 1. Install globally
+npm install @codemieai/code
 
 # 2. Setup (interactive wizard)
-codemie setup
+npx codemie setup
 
 # 3. Start coding with the built-in agent
-codemie-code "Review my code for bugs"
+npx codemie-code "Review my code for bugs"
 
 # 4. Install and use other agents
-codemie install claude
-codemie-claude "Refactor this function"
+npx codemie install claude
+npx codemie-claude "Refactor this function"
 ```
 
 ## Installation
@@ -51,7 +55,18 @@ codemie-claude "Refactor this function"
 ### From npm (Recommended)
 
 ```bash
-npm install -g @codemieai/code
+# Install the package
+npm install @codemieai/code
+
+# Use with npx
+npx codemie --help
+```
+
+Alternatively, for frequent use, you can install globally:
+
+```bash
+npm install --global @codemieai/code
+codemie --help
 ```
 
 ### From Source
