@@ -22,6 +22,8 @@ This project is **AI/Run CodeMie CLI** - a professional, unified CLI tool for ma
 | `src/cli/**` | `src/cli/CLAUDE.md` | CLI command patterns, factory pattern, testing |
 | `src/analytics/**` | `src/analytics/CLAUDE.md` | Analytics system, aggregation, metrics, CLI usage |
 | `src/workflows/**` | `src/workflows/CLAUDE.md` | Workflow management, template development, VCS integration |
+| `tests/integration/**` | `tests/integration/CLAUDE.md` | Integration testing patterns, performance optimization, fixture management |
+| `tests/integration/metrics/**` | `tests/integration/metrics/CLAUDE.md` | Agent metrics testing with full verification suite, golden dataset validation |
 
 **Token Savings**: This structure reduces context by 30-70% depending on work location, enabling faster responses and more focused guidance.
 
@@ -275,6 +277,38 @@ All shortcuts support CLI overrides:
 
 **Pass-through**: Use `allowUnknownOption()` and filter known config options before forwarding to agent.
 
+### Git Commits and Pull Requests
+
+**CRITICAL: Keep commits and PRs simple and focused**
+
+1. **Commit Messages**:
+   - **1-2 sentences maximum** - Brief summary of what changed
+   - Follow conventional commit format: `type(scope): description`
+   - Examples:
+     - ✅ `feat(agents): add codex metrics support`
+     - ✅ `fix(cli): resolve path handling on Windows`
+     - ❌ Multi-paragraph explanations with implementation details
+
+2. **Pull Request Descriptions**:
+   - **Strictly follow the PR template** (`.github/PULL_REQUEST_TEMPLATE.md`)
+   - Summary: 1-2 sentences describing the change
+   - Complete the checklist items
+   - Do NOT add extensive implementation details or feature lists
+   - Let code and tests speak for themselves
+
+3. **PR Template Structure**:
+   ```markdown
+   ## Summary
+   <!-- 1-2 sentences only -->
+
+   ## Checklist
+   - [ ] Self-reviewed
+   - [ ] Manual testing performed
+   - [ ] Documentation updated (if needed)
+   ```
+
+**Remember**: Simple, concise descriptions are better than verbose explanations.
+
 ### Cross-Module Development
 
 When working across multiple modules:
@@ -301,6 +335,7 @@ When writing code for this project, ask yourself:
 ✅ **Error Handling**: Are error messages actionable?
 ✅ **Testing**: Integration test > unit test?
 ✅ **Documentation**: Will this require doc updates?
+✅ **Commits & PRs**: Are commit messages 1-2 sentences? Does PR follow template?
 
 ---
 
